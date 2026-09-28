@@ -736,6 +736,19 @@ Things to keep in mind:
   - A stranger cannot get in without your **Allow** on the phone, so deny any
     "Allow USB debugging?" prompt you didn't cause.
   - Close the port with a reboot, `adb usb`, or by turning USB debugging off.
+  - *Anecdote (one test, not a guarantee, nothing to act on):*
+    - **The setup:** on 2026-09-28 the phone was on Cellcom mobile data.
+      adbd listened on `[::]:5555` (all addresses), and the phone had a
+      public Cellcom IPv6 address.
+    - **The test:** an online port checker (portchecker.co) reported port
+      5555 on that IPv6 address as **closed**. The same checker reported
+      port 443 open on Google's and Cloudflare's IPv6 DNS servers, so it
+      could reach IPv6.
+    - **What it suggests:** Cellcom filters unsolicited inbound IPv6, at
+      least at that time.
+    - **Over IPv4** the phone sat behind carrier NAT (a 10.x address), so
+      that side was unreachable anyway.
+    - **Other networks may differ**, especially public Wi-Fi.
 - **Keep the phone updated.** CVE-2026-0073 (a Wireless-debugging
   authentication bypass) was fixed in the 2026-05-01 patch level
   ([details](docs/android-research.md#10-known-risks-and-pending-changes)).
