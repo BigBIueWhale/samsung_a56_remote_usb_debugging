@@ -93,6 +93,12 @@ timeout 20 adb -s 127.0.0.1:7555 shell echo ok        # D: expect "ok"
 **Healthy** means A shows a `LISTEN` line on `127.0.0.1:7555`, C prints
 `device`, and D prints `ok`.
 
+This check was first run by an agent (Claude Code CLI) on 2026-09-28, and was
+healthy on the first try. Its output is in
+[`logs/workstation-session.txt`](logs/workstation-session.txt).
+- A single `adb shell` round trip took 0.05–0.10 s.
+- A full screenshot took about 2 s and 0.4 MB of mobile data.
+
 **When it isn't healthy,** try B, C and D again **at most 3 times, about 10
 seconds apart**. If it's still unhealthy:
 

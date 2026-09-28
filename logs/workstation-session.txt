@@ -1,0 +1,70 @@
+Workstation side of the tunnel (Step 10), 2026-09-28, Israel time (UTC+3).
+Run by the AI agent (Claude Code CLI) on the Ubuntu workstation, following
+AGENT_BRIEFING.md. Verbatim output. No screenshot of the phone's screen was
+saved; the screencap below was piped to `wc -c` to measure it.
+
+--- First connection (AGENT_BRIEFING.md section 5 check), a few minutes before 10:16 ---
+
+$ ss -ltn 'sport = :7555'
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+$ timeout 15 adb connect 127.0.0.1:7555
+connected to 127.0.0.1:7555
+$ timeout 15 adb -s 127.0.0.1:7555 get-state
+device
+$ timeout 20 adb -s 127.0.0.1:7555 shell echo ok
+ok
+$ timeout 10 adb devices
+List of devices attached
+127.0.0.1:7555	device
+
+--- Second check and phone facts, 2026-09-28T10:16:11+03:00 ---
+
+$ ss -ltn 'sport = :7555'
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+$ adb version
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+$ adb connect 127.0.0.1:7555
+already connected to 127.0.0.1:7555
+$ adb devices -l
+List of devices attached
+127.0.0.1:7555         device product:a56xnaxx model:SM_A566B device:a56x transport_id:4
+
+$ adb -s 127.0.0.1:7555 get-state
+device
+$ adb -s 127.0.0.1:7555 shell echo ok
+ok
+$ adb -s 127.0.0.1:7555 shell 'for p in ...; do echo "$p=$(getprop $p)"; done'
+ro.product.model=SM-A566B
+ro.product.device=a56x
+ro.build.version.release=16
+ro.build.version.sdk=36
+ro.build.version.security_patch=2026-08-05
+ro.build.display.id=BP4A.251205.006.A566BXXSDCZHB
+ro.build.version.oneui=80500
+service.adb.tcp.port=5555
+persist.adb.tcp.port=
+
+--- Speed over the tunnel ---
+
+$ for i in 1 2 3 4 5; do /usr/bin/time -f "%e s" timeout 20 adb -s 127.0.0.1:7555 shell true; done
+0.06 s
+0.10 s
+0.08 s
+0.05 s
+0.06 s
+$ /usr/bin/time -f "%e s" sh -c "timeout 60 adb -s 127.0.0.1:7555 exec-out screencap -p | wc -c"
+422096
+2.23 s
+$ /usr/bin/time -f "%e s" timeout 20 adb -s 127.0.0.1:7555 shell wm size
+Physical size: 1080x2340
+0.13 s
+
+--- The phone's active network at the time ---
+
+$ adb -s 127.0.0.1:7555 shell 'dumpsys connectivity | grep -m3 -E "Active default network|NetworkAgentInfo.*(CELLULAR|WIFI)"'
+Active default network: 229
+  NetworkAgentInfo{network{229} ... ni{MOBILE[LTE] CONNECTED ...} created=2026-09-28T06:44:32.753Z ...
+(trimmed to the relevant fields; the default network was mobile data, not Wi-Fi)

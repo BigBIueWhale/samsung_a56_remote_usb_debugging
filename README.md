@@ -10,16 +10,16 @@ It was done on **2026-09-28**. Every screenshot and every Terminal output below
 comes from that session. Nothing here is secret, and the security of the setup
 doesn't depend on it being secret (see [Security model](#10-security-model)).
 
-> **Status as of writing**
+> **Status: working end to end (verified 2026-09-28)**
 >
-> Steps 1-9 were performed and their outputs are recorded below and in
-> [`logs/termux-session.txt`](logs/termux-session.txt).
->
-> Step 9 ended with the reverse SSH tunnel established: the password was
-> accepted and ssh went silent.
->
-> The workstation-side Step 10 (`adb connect 127.0.0.1:7555`) was the next
-> action. Its output was **not** captured before this README was written.
+> - **Steps 1–9** were performed on the phone. Their outputs are recorded below
+>   and in [`logs/termux-session.txt`](logs/termux-session.txt).
+> - **Step 10** was then run on the workstation by the AI agent (Claude Code
+>   CLI), following [`AGENT_BRIEFING.md`](AGENT_BRIEFING.md). The phone came up
+>   as `127.0.0.1:7555  device` on the first try, with no authorization prompt.
+>   Shell, getprop and screencap all worked over mobile data. The output is in
+>   [Step 10](#step-10--connect-from-the-workstation-the-agents-side) and
+>   [`logs/workstation-session.txt`](logs/workstation-session.txt).
 
 ---
 
@@ -97,7 +97,7 @@ NAT and can't accept incoming connections. It can always make outgoing ones.
 
 | Piece | Details |
 |---|---|
-| **Phone** | Samsung Galaxy A56 5G, **not rooted**, official Samsung firmware (One UI 8.x / Android 16 era; the exact build wasn't recorded, see *Settings → About phone → Software information*). Was on **5G** mobile data. |
+| **Phone** | Samsung Galaxy A56 5G (**SM-A566B**, device `a56x`), **not rooted**, official Samsung firmware: **Android 16** (SDK 36), One UI 8.5 (`ro.build.version.oneui=80500`), build **`BP4A.251205.006.A566BXXSDCZHB`**, security patch **2026-08-05**. These were read over the tunnel in Step 10. Was on mobile data. |
 | **Termux** (phone) | Already installed. Packages used: `android-tools` **35.0.2-7** (adb), `openssh` **10.3p1-1** (ssh), from the `termux.net` stable repository. |
 | **WireGuard app** (phone) | Official app from Google Play, with a profile from [mobile-egress-wireguard](https://github.com/BigBIueWhale/mobile-egress-wireguard). **Optional.** |
 | **Workstation** | Ubuntu 24.04, set up with [BigBIueWhale/personal_server](https://github.com/BigBIueWhale/personal_server). adb was already installed. |
@@ -464,24 +464,55 @@ adb connect 127.0.0.1:7555
 adb devices
 ```
 
-**Expected:**
+**What happened (2026-09-28, run by the AI agent):**
 
-1. The phone shows **"Allow USB debugging?"** with the workstation's key
-   fingerprint. This is the first time *this* computer's key is used in
-   legacy TCP mode.
-2. Tick **Always allow from this computer** and tap **Allow**.
-3. `adb devices` then shows:
-
-```
+```console
+$ ss -ltn 'sport = :7555'
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+$ adb connect 127.0.0.1:7555
+connected to 127.0.0.1:7555
+$ adb -s 127.0.0.1:7555 get-state
+device
+$ adb -s 127.0.0.1:7555 shell echo ok
+ok
+$ adb devices -l
 List of devices attached
-127.0.0.1:7555  device
+127.0.0.1:7555         device product:a56xnaxx model:SM_A566B device:a56x transport_id:4
 ```
 
-If it shows `unauthorized`, accept the prompt on the phone and run
-`adb devices` again.
+Full output, including the phone's build properties:
+[`logs/workstation-session.txt`](logs/workstation-session.txt).
 
-> This step's real output was **not** captured during the session (see the
-> status note at the top). If you run it, paste the result here.
+**What it shows:**
+
+- **The tunnel is up and loopback-only.** sshd listens on `127.0.0.1:7555`
+  only, as `GatewayPorts no` promises ([§4.4](#44-why-the-phone-starts-an-ssh-tunnel)).
+- **No "Allow USB debugging?" prompt appeared.** The state was `device` at
+  once, never `unauthorized`.
+  - This workstation had already been authorized over a USB cable ("Always
+    allow").
+  - Android authorizes an adb **key**, not a transport, so the same
+    `~/.android/adbkey` was accepted through the tunnel.
+  - A workstation that was never authorized **does** get the prompt: tick
+    **Always allow from this computer** and tap **Allow**.
+- **Legacy TCP mode is active.** `service.adb.tcp.port=5555` is the
+  non-persistent property set by Step 6. The persistent
+  `persist.adb.tcp.port` is empty, which is why a reboot undoes it.
+- **It works over mobile data.** At the time, the phone's default network was
+  `MOBILE[LTE]`, not Wi-Fi.
+
+**Measured speed over the tunnel:**
+
+| Operation | Time |
+|---|---|
+| `adb shell true` (one round trip), 5 runs | 0.05–0.10 s |
+| `adb shell wm size` | 0.13 s |
+| Full-resolution screenshot, `exec-out screencap -p` (1080×2340 PNG, 422,096 bytes) | 2.2 s |
+
+Small commands feel almost local. Screenshots take a couple of seconds and
+cost about 0.4 MB of mobile data each, so an agent should batch commands and
+not screenshot needlessly (as [`AGENT_BRIEFING.md`](AGENT_BRIEFING.md) says).
 
 ---
 
@@ -682,6 +713,8 @@ screenshots/
   05-wireless-debugging-details.jpg                  Step 3
 logs/
   termux-session.txt                    verbatim Termux output of the whole session
+  workstation-session.txt               the workstation side (Step 10), run by the AI agent:
+                                        connection checks, the phone's build, measured speed
 docs/
   why-not-directly-over-wireguard.md    why the VPN can't be used for workstation→phone
                                         connections (firewall analysis, exact line links)
