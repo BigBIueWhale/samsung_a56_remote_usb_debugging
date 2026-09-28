@@ -1,0 +1,106 @@
+Stale tunnel after a network drop – 2026-09-28, Israel time (UTC+3).
+Verbatim output, trimmed only where marked. The phone was away from home, on
+mobile data; the tunnel had been opened at 09:51 that morning.
+
+=== 1. Workstation (the agent), about 14:30: commands hang ===
+
+$ ss -ltn 'sport = :7555'
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+$ timeout 15 adb connect 127.0.0.1:7555
+already connected to 127.0.0.1:7555
+$ timeout 15 adb -s 127.0.0.1:7555 get-state
+device
+$ timeout 20 adb -s 127.0.0.1:7555 shell echo ok
+(no output; exit code 124 = killed by timeout)
+
+Retried 3 times, about 10 s apart, per AGENT_BRIEFING.md section 5:
+try 1: device /
+try 2: device /
+try 3: device /
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+
+=> The listener exists and adb still says "device", but nothing answers:
+   Case 4 in AGENT_BRIEFING.md. The agent stopped and asked the owner to
+   restart the tunnel.
+
+=== 2. Phone (Termux): the owner restarts the tunnel ===
+
+~ $ termux-wake-lock
+~ $ ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+user@ronenzyroff.com's password:
+Permission denied, please try again.
+user@ronenzyroff.com's password:
+Read from remote host ronenzyroff.com: Software caused connection abort
+client_loop: send disconnect: Broken pipe
+~ $ ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+user@ronenzyroff.com's password:
+ssh_dispatch_run_fatal: Connection to 149.106.155.35 port 22: Software caused connection abort
+~ $ ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+user@ronenzyroff.com's password:
+Error: remote port forwarding failed for listen port 7555
+~ $ ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+user@ronenzyroff.com's password:
+
+~ $
+
+What each attempt shows:
+- 1st: a mistyped password, then the mobile connection dropped mid-session.
+- 2nd: the connection dropped again during login.
+- 3rd: login worked, but the workstation refused the forward: port 7555 was
+  still held by the old tunnel's sshd session. With ExitOnForwardFailure=yes,
+  ssh quit instead of pretending to work.
+- 4th: exited back to the prompt, most likely the same refusal.
+
+=== 3. Workstation: find and end the stale session ===
+
+$ ss -ltnp 'sport = :7555'
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+   (no process shown: ss -p doesn't name the owner here without root)
+
+$ ps -eo pid,user,lstart,etime,cmd | grep sshd | grep -v grep
+   4680 root     Thu Sep 24 03:12:35 2026  4-11:34:47 sshd: /usr/sbin/sshd -D -e [listener] 0 of 10-100 startups
+   8179 root     Thu Sep 24 03:12:41 2026  4-11:34:41 sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups
+  11628 root     Mon Sep 28 09:51:07 2026    04:56:15 sshd: user [priv]
+  12630 user     Mon Sep 28 09:51:49 2026    04:55:33 sshd: user
+
+   The only logged-in session is 12630, started 09:51, when the tunnel was
+   first opened. It runs as "user", so no sudo is needed to end it.
+
+$ ps --ppid 12630 -o pid,etime,cmd
+    PID     ELAPSED CMD
+   (no children: no shell, no programs – an "ssh -N" forwarding-only
+   session. An interactive login would have a shell child here; never end
+   that one.)
+
+$ kill 12630
+$ ps -p 12630 >/dev/null && echo "still running" || echo "12630 ended"
+12630 ended
+$ ss -ltn 'sport = :7555' | tail -n +2
+   (empty – the port is free)
+$ adb disconnect 127.0.0.1:7555
+disconnected 127.0.0.1:7555
+
+=== 4. Phone: the owner reruns the ssh command ===
+
+At 14:48:56 a new login was in progress on the workstation:
+ 483018 root     Mon Sep 28 14:48:45 2026       00:10 sshd: user [priv]
+ 483020 sshd     Mon Sep 28 14:48:45 2026       00:10 sshd: user [net]
+   ("[net]" = still authenticating: the password was being typed.)
+
+=== 5. Workstation: working again, 2026-09-28 14:49:33 ===
+
+$ ss -ltn 'sport = :7555' | tail -n +2
+LISTEN 0      128        127.0.0.1:7555      0.0.0.0:*
+$ ps -eo pid,user,lstart,etime,cmd | grep "sshd: user" | grep -v grep
+ 483018 root     Mon Sep 28 14:48:45 2026       00:47 sshd: user [priv]
+ 483539 user     Mon Sep 28 14:49:06 2026       00:25 sshd: user
+$ adb connect 127.0.0.1:7555
+connected to 127.0.0.1:7555
+$ adb -s 127.0.0.1:7555 get-state
+device
+$ adb -s 127.0.0.1:7555 shell echo ok
+ok
+
+No reboot and no re-bootstrap were needed: adbd's port 5555 on the phone had
+stayed open the whole time; only the SSH leg had died.

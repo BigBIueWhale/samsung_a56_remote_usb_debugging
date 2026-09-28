@@ -613,11 +613,85 @@ run `adb -d tcpip 5555`, then unplug. `-d` means "the USB-connected device".
 | `error: no such device` on `adb disconnect <ip:port>` | Entry already gone | Harmless |
 | `127.0.0.1:5555` refused **in Termux** | Phone rebooted (port reset), or USB debugging was turned off | Redo the reboot routine ([§8](#after-the-phone-reboots)) and keep USB debugging on |
 | ssh: `Permission denied, please try again.` | Wrong password (it doesn't echo; phone keyboard may auto-capitalize) | Type it again carefully; after 3 failures, rerun the command |
-| ssh: `Warning: remote port forwarding failed for listen port 7555` (then exits) | Something on the workstation already holds 7555, usually an **old tunnel's sshd process** that hasn't noticed the phone left | On the workstation: `sudo ss -ltnp 'sport = :7555'` shows the process; `sudo kill <pid>` it, or use another port such as `-R 7556:…` and `adb connect 127.0.0.1:7556` |
+| ssh: `Error: remote port forwarding failed for listen port 7555` (then exits) | The workstation still holds 7555 for an **old tunnel's sshd session** that hasn't noticed the phone left (happened on 2026-09-28; see [§9.1](#91-a-stale-tunnel-after-a-network-drop-2026-09-28)) | On the workstation, end the stale forwarding-only `sshd: user` session (steps in §9.1), then rerun ssh in Termux. Or use another port, such as `-R 7556:…` and `adb connect 127.0.0.1:7556`. |
+| ssh: `Software caused connection abort` / `client_loop: send disconnect: Broken pipe` | The phone's mobile connection dropped during login or the session | Just run the ssh command again; turn on WireGuard for persistence |
+| Workstation: `get-state` says `device`, but every `adb shell` hangs until a timeout | The SSH leg died silently. The workstation's listener and adb's connection look alive, but nothing reaches the phone. | Restart the tunnel in Termux (Ctrl+C, rerun ssh). If Termux then reports `remote port forwarding failed`, see the row above. |
 | Workstation: `failed to connect to 127.0.0.1:7555` / `Connection refused` | Tunnel isn't up | Check Termux: ssh must be running silently |
 | Workstation: `unauthorized` | Phone is waiting for you to approve the workstation's key | Tap **Allow** (with "Always allow") on the phone |
 | Device drops after a while | Termux was frozen/killed in the background, or the network changed (without WireGuard) | `termux-wake-lock`, Termux in "Never sleeping apps", rerun ssh; turn on WireGuard for persistence |
 | USB debugging greyed out / Wireless debugging won't stay on | Samsung Auto Blocker | Settings → Security and privacy → Auto Blocker → off |
+
+### 9.1 A stale tunnel after a network drop (2026-09-28)
+
+**What happened.** The phone was away from home on mobile data. At about
+14:30 the agent's commands started hanging: the listener on `127.0.0.1:7555`
+was still there, and `adb get-state` still said `device`, but `adb shell echo
+ok` timed out every time (Case 4 in [`AGENT_BRIEFING.md`](AGENT_BRIEFING.md)).
+In Termux the owner restarted the tunnel:
+- the first two attempts were cut by the network ("Software caused connection
+  abort");
+- the third logged in but was refused with **`Error: remote port forwarding
+  failed for listen port 7555`**.
+
+Full verbatim log:
+[`logs/2026-09-28-stale-tunnel-incident.txt`](logs/2026-09-28-stale-tunnel-incident.txt).
+
+**Why.**
+- **The old SSH session never learned the phone was gone.** When the mobile
+  link died, the workstation's sshd session for the old tunnel (started at
+  09:51) stayed alive. It kept holding `127.0.0.1:7555`.
+- **Only the phone checks the link.** `ServerAliveInterval=30` makes the
+  *phone* notice a dead link. The workstation's sshd has no matching check
+  (`ClientAliveInterval` is off by default), so it waits for TCP to time out,
+  which can take a very long time.
+- **The new tunnel can't take the port.** It asks for the same 7555, and
+  `ExitOnForwardFailure=yes` makes it quit instead of running without the
+  forward.
+
+**The fix (on the workstation; no sudo needed):**
+
+1. **Find the stale session.** Tunnel sessions show up as `sshd: user`,
+   running as `user`:
+
+   ```sh
+   ps -eo pid,user,lstart,etime,cmd | grep "sshd: user" | grep -v grep
+   ```
+
+   `ss -ltnp` may not name the process that owns 7555 without root.
+
+2. **Make sure it's a tunnel, not someone's login.** A forwarding-only
+   (`ssh -N`) session has **no child processes**. An interactive login
+   always has a shell under it, so never end one that does:
+
+   ```sh
+   ps --ppid <pid> -o pid,etime,cmd      # must list nothing
+   ```
+
+3. **End it, and check the port is free:**
+
+   ```sh
+   kill <pid>
+   ss -ltn 'sport = :7555'               # must list nothing
+   adb disconnect 127.0.0.1:7555         # drop adb's stale entry
+   ```
+
+4. **Rerun the tunnel command in Termux.** It goes silent. Then, on the
+   workstation:
+
+   ```sh
+   adb connect 127.0.0.1:7555 && adb -s 127.0.0.1:7555 shell echo ok
+   ```
+
+**Result:** at 14:49 the new tunnel was up and `adb shell echo ok` answered.
+**No reboot or re-bootstrap was needed.** adbd's port 5555 on the phone had
+stayed open throughout; only the SSH leg had died.
+
+**Possible prevention (not applied; it's the owner's call).** Setting
+`ClientAliveInterval 30` and `ClientAliveCountMax 3` in the workstation's sshd
+configuration would make sshd drop a dead session after about 90 seconds,
+freeing the port on its own. That's a change to
+[personal_server](https://github.com/BigBIueWhale/personal_server)'s SSH
+setup, so it isn't made here.
 
 ---
 
@@ -715,6 +789,7 @@ logs/
   termux-session.txt                    verbatim Termux output of the whole session
   workstation-session.txt               the workstation side (Step 10), run by the AI agent:
                                         connection checks, the phone's build, measured speed
+  2026-09-28-stale-tunnel-incident.txt  a dead tunnel holding port 7555, and how it was freed (§9.1)
 docs/
   why-not-directly-over-wireguard.md    why the VPN can't be used for workstation→phone
                                         connections (firewall analysis, exact line links)

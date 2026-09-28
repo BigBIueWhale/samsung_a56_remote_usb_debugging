@@ -139,8 +139,22 @@ stopped it.
 >    continue.
 >
 > If Termux prints `remote port forwarding failed for listen port 7555`, an old
-> tunnel is still holding the port on the workstation. Tell me, and I'll show
-> you which process to stop, or we'll switch to port 7556.
+> tunnel is still holding the port on the workstation. Tell me, and I'll free
+> it, or we'll switch to port 7556.
+
+**Freeing the port yourself (agent).** This is allowed. It ends only a dead
+session of the same `user` account, and changes no configuration.
+1. `ps -eo pid,user,lstart,etime,cmd | grep "sshd: user" | grep -v grep`
+2. Pick the old tunnel session: the one started when the previous tunnel was
+   opened.
+3. `ps --ppid <pid>` must list **nothing**. A session with a shell under it is
+   someone's interactive login: **never** end that one.
+4. `kill <pid>`, then confirm `ss -ltn 'sport = :7555'` is empty, and run
+   `adb disconnect 127.0.0.1:7555`.
+5. Ask the owner to rerun the ssh command.
+
+Worked example:
+[README §9.1](README.md#91-a-stale-tunnel-after-a-network-drop-2026-09-28).
 
 ### Case 2: the listener exists, but adb can't reach the phone
 
@@ -192,7 +206,7 @@ workstation's key, or the authorization was revoked.
 Don't tap it yourself. You can't while unauthorized anyway, and you must not
 while authorized.
 
-### Case 4: commands hang or time out, but the listener exists and state flips between `device` and `offline`
+### Case 4: commands hang or time out, but the listener exists (state may stay `device`, or flip to `offline`)
 
 **Meaning:** weak or congested mobile signal, or a half-dead tunnel.
 
@@ -202,6 +216,11 @@ while authorized.
 > signal. If it stays bad, restart the tunnel in Termux: **Ctrl+C**, then run
 > the ssh command again. Turning **WireGuard on** first (and using
 > `user@172.30.77.1`) makes the tunnel survive network switches.
+
+**Seen on 2026-09-28:** `get-state` kept saying `device` while every `adb
+shell` timed out. The SSH leg had died silently. When the owner restarted
+the tunnel, it hit `remote port forwarding failed`, because the old session
+still held 7555. The fix is under Case 1, "Freeing the port yourself".
 
 ## 7. When the owner says "continue"
 
