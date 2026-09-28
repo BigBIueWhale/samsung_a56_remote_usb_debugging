@@ -1,0 +1,210 @@
+# Briefing for an AI agent controlling the Galaxy A56
+
+*This file is written to you, the AI agent (Claude Code, Codex, or similar),
+running on the owner's Ubuntu workstation (`ronenzyroff.com`). The owner will
+point you here. Read all of it before touching the phone.*
+
+## 1. What changed
+
+**Before:** the phone was plugged into this workstation by **USB**. `adb` saw
+it as a USB device, and the connection only broke if someone pulled the cable.
+
+**Now:**
+
+- **There is no cable.** The phone is on **5G mobile data**, somewhere else.
+- **It appears on this workstation as `127.0.0.1:7555`.** That local port is a
+  reverse SSH tunnel that the **phone itself** opened from Termux to this
+  workstation's SSH server. It leads to the phone's adb daemon on the phone's
+  `127.0.0.1:5555`, which runs in "legacy TCP mode".
+- **You get the same adb capabilities as over USB:** shell, input,
+  screencap, install, pull and push.
+- **But the link is fragile, and only the human can repair it.** Nothing on
+  this workstation can re-open it, because the phone has to start the
+  connection. The full design is in [README.md](README.md).
+
+## 2. How to address the phone
+
+Always target it explicitly, in every command:
+
+```sh
+export ANDROID_SERIAL=127.0.0.1:7555     # or pass: adb -s 127.0.0.1:7555 ...
+```
+
+If `adb devices` doesn't list it yet, run `adb connect 127.0.0.1:7555` first.
+Never rely on "the only device". A USB device or a stale entry could also be
+listed.
+
+## 3. Working over this link
+
+- **Wrap every adb call in a timeout,** for example
+  `timeout 30 adb -s 127.0.0.1:7555 shell ...`. A dead mobile link often hangs
+  instead of failing.
+- **Prefer short, one-shot commands** over long interactive `adb shell`
+  sessions. Batch related steps into one call, for example
+  `adb shell 'cmd1 && cmd2'`: every round trip crosses 5G.
+- **Expect lower speed.** Screenshots (`adb exec-out screencap -p > s.png`)
+  take seconds, not milliseconds. Large `pull`, `push` or `install` operations
+  are slow and use the owner's mobile data, so avoid them unless needed.
+- **Check state after anything that failed midway.** If a command failed or
+  timed out, you don't know whether it took effect on the phone. After
+  reconnecting, check the current state (screenshot, UI dump) before
+  continuing. Never blindly repeat an action that may already have happened.
+
+## 4. Never do these (they cut the link, and only the human can restore it)
+
+- **`adb reboot`** in any form. A reboot closes port 5555, and restoring it
+  needs the human, a Wi-Fi network, and Wireless debugging.
+- **`adb usb` or `adb tcpip <anything>`.** Both restart the phone's adb daemon
+  and break the tunnel's target port.
+- **Turning off USB debugging, Wireless debugging, or Developer options,** by
+  any means. That includes `settings put global adb_enabled 0`,
+  `settings put global development_settings_enabled 0`, or tapping them in
+  Settings.
+  - **Why USB debugging matters:** it is what keeps the adb daemon alive
+    without Wi-Fi.
+- **Cutting the phone's connectivity:** airplane mode, disabling mobile data
+  (`svc data disable`, `cmd connectivity airplane-mode enable`), or turning
+  Wi-Fi on or off. Also changing APN or network settings, or touching the
+  **WireGuard** app or VPN settings.
+- **Stopping, clearing, uninstalling, or restricting Termux
+  (`com.termux`).** That includes `am force-stop com.termux`, `pm clear`,
+  battery restrictions, and closing it from Recents. **The tunnel lives inside
+  Termux.**
+- **Approving security prompts.** Never tap "Allow USB debugging?", "Allow
+  wireless debugging on this network?", or any other authorization dialog on
+  the owner's behalf. Those are the owner's decisions. The same goes for
+  entering or guessing the phone's lock-screen PIN.
+- **Changing this workstation's networking** to "fix" connectivity: the SSH
+  server configuration, firewall rules, the `mobile-wireguard` containers, or
+  routes. Those are the owner's security boundaries.
+
+## 5. How to tell whether the phone is connected
+
+Run this check before starting work, and again whenever an adb command errors,
+times out, or behaves oddly:
+
+```sh
+ss -ltn 'sport = :7555'                               # A: is the tunnel's listener present?
+timeout 15 adb connect 127.0.0.1:7555                 # B: (re)attach
+timeout 15 adb -s 127.0.0.1:7555 get-state            # C: expect "device"
+timeout 20 adb -s 127.0.0.1:7555 shell echo ok        # D: expect "ok"
+```
+
+**Healthy** means A shows a `LISTEN` line on `127.0.0.1:7555`, C prints
+`device`, and D prints `ok`.
+
+**When it isn't healthy,** try B, C and D again **at most 3 times, about 10
+seconds apart**. If it's still unhealthy:
+
+- **Stop all phone operations.** Don't keep retrying in a loop, and don't try
+  workarounds from section 4.
+- **Tell the owner:**
+  - what you were doing;
+  - the last step you *know* completed;
+  - which case below matches;
+  - the exact instructions for that case, copied from below.
+- **Then wait** for the owner to say the link is back. After that, run the
+  check again and re-verify the phone's state before resuming.
+
+## 6. Diagnosis, and what to tell the owner
+
+### Case 1: no listener on `127.0.0.1:7555` (check A is empty)
+
+**Meaning:** the SSH tunnel from the phone is down. Termux was closed or
+frozen, the phone switched networks, the 5G connection dropped, or the owner
+stopped it.
+
+**Tell the owner:**
+
+> The phone's tunnel to the workstation is down. Please, on the phone:
+>
+> 1. Open **Termux**. If an old `ssh` command is still on screen, press
+>    **Ctrl+C**.
+> 2. Run:
+>
+>    ```
+>    termux-wake-lock
+>    ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+>    ```
+>
+>    If WireGuard is on, use `user@172.30.77.1` instead of
+>    `user@ronenzyroff.com`.
+> 3. Type the password. When it goes silent, leave it running and tell me to
+>    continue.
+>
+> If Termux prints `remote port forwarding failed for listen port 7555`, an old
+> tunnel is still holding the port on the workstation. Tell me, and I'll show
+> you which process to stop, or we'll switch to port 7556.
+
+### Case 2: the listener exists, but adb can't reach the phone
+
+This means check A is fine, but B, C or D fail: `Connection refused`,
+`closed`, `offline`, `no devices/emulators found`, or a protocol error.
+
+**Meaning:** the tunnel is up, but nothing answers on the phone's port 5555.
+Most likely **the phone rebooted**, which resets legacy TCP mode, or **USB
+debugging was turned off**.
+
+**Tell the owner:**
+
+> The tunnel is up, but the phone's adb port 5555 isn't answering. It probably
+> rebooted. Please, on the phone:
+>
+> 1. Check **Settings → Developer options → USB debugging** is **on**.
+> 2. Connect to **any Wi-Fi network as a client**. Your own hotspot doesn't
+>    count; a friend's hotspot or any Wi-Fi does.
+> 3. Turn on **Wireless debugging**. Tap **Allow** if asked about the network.
+> 4. Tap the words **Wireless debugging** and read **IP address & Port**.
+> 5. In Termux, using those values:
+>
+>    ```
+>    adb connect <IP>:<PORT>
+>    adb -s <IP>:<PORT> tcpip 5555
+>    ```
+>
+>    Expect `restarting in TCP mode port: 5555`.
+> 6. Check it with `adb connect 127.0.0.1:5555` and `adb devices`. Expect
+>    `127.0.0.1:5555  device`.
+> 7. You can leave Wi-Fi now. Restart the ssh tunnel if it dropped (Case 1
+>    commands), then tell me to continue.
+
+**If you have made a tunnel before and there is no listener at all,** treat it
+as Case 1 first. The owner will find out from Termux whether port 5555 also
+needs restoring.
+
+### Case 3: `unauthorized`
+
+**Meaning:** the phone is showing an **"Allow USB debugging?"** prompt for this
+workstation's key, or the authorization was revoked.
+
+**Tell the owner:**
+
+> The phone is asking whether to trust this workstation. On the phone, tick
+> **Always allow from this computer** and tap **Allow**, then tell me to
+> continue.
+
+Don't tap it yourself. You can't while unauthorized anyway, and you must not
+while authorized.
+
+### Case 4: commands hang or time out, but the listener exists and state flips between `device` and `offline`
+
+**Meaning:** weak or congested mobile signal, or a half-dead tunnel.
+
+**Tell the owner:**
+
+> The connection to the phone is unstable (timeouts). Please check the phone's
+> signal. If it stays bad, restart the tunnel in Termux: **Ctrl+C**, then run
+> the ssh command again. Turning **WireGuard on** first (and using
+> `user@172.30.77.1`) makes the tunnel survive network switches.
+
+## 7. When the owner says "continue"
+
+1. Run the section 5 check again.
+2. Take a fresh screenshot or UI dump. The phone may have changed while you
+   were disconnected: the screen may be locked, or a different app may be in
+   front.
+3. Resume from the **last step you verified**, not the last step you
+   attempted.
+
+If the screen is locked, ask the owner to unlock it. Never try to unlock it
+yourself.

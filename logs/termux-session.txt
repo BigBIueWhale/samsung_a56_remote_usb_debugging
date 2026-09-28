@@ -1,0 +1,144 @@
+Termux session on the Samsung Galaxy A56 5G, 2026-09-28 (phone clock ~09:30-09:45)
+==================================================================================
+
+Everything below the "####" annotation lines is copied verbatim from the Termux
+screen as it was pasted during the session. The "####" lines are annotations
+added afterwards; they are not terminal output. The pairing code (934495) and
+the pairing port (46285) are single-use and expired long ago. The account
+password was never displayed (ssh does not echo it) and is not recorded here.
+
+#### Step 4 - install adb inside Termux (phone connected to the friend's iPhone hotspot)
+
+Welcome to Termux
+
+Docs:       https://doc.termux.com
+Community:  https://community.termux.com
+
+Working with packages:
+ - Search:  pkg search <query>
+ - Install: pkg install <package>
+ - Upgrade: pkg upgrade
+
+Report issues at https://bugs.termux.com
+~ $ pkg install android-tools
+Get:1 https://termux.net stable InRelease [1089 B]
+Get:2 https://termux.net stable/main aarch64 Packages [254 kB]
+Fetched 255 kB in 1s (351 kB/s)
+22 packages can be upgraded. Run 'apt list --upgradable' to see them.
+Installing:
+  android-tools
+
+Installing dependencies:
+  abseil-cpp  brotli  fmt  liblz4  libprotobuf  zstd
+
+Summary:
+  Upgrading: 0, Installing: 7, Removing: 0, Not Upgrading: 22
+  Download size: 5266 kB
+  Space needed: 32.6 MB
+
+Continue? [Y/n] y
+Get:1 https://termux.net stable/main aarch64 abseil-cpp aarch64 20250814.1 [1046 kB]
+Get:2 https://termux.net stable/main aarch64 brotli aarch64 1.2.0 [341 kB]
+Get:3 https://termux.net stable/main aarch64 fmt aarch64 1:11.2.0 [169 kB]
+Get:4 https://termux.net stable/main aarch64 liblz4 aarch64 1.10.0-1 [84.7 kB]
+Get:5 https://termux.net stable/main aarch64 libprotobuf aarch64 2:33.1-1 [1327 kB]
+Get:6 https://termux.net stable/main aarch64 zstd aarch64 1.5.7-1 [360 kB]
+Get:7 https://termux.net stable/main aarch64 android-tools aarch64 35.0.2-7 [1937 kB]
+Fetched 5266 kB in 2s (2695 kB/s)
+Selecting previously unselected package abseil-cpp.
+(Reading database ... 4613 files and directories currently installed.)
+Preparing to unpack .../0-abseil-cpp_20250814.1_aarch64.deb ...
+Unpacking abseil-cpp (20250814.1) ...
+Selecting previously unselected package brotli.
+Preparing to unpack .../1-brotli_1.2.0_aarch64.deb ...
+Unpacking brotli (1.2.0) ...
+Selecting previously unselected package fmt.
+Preparing to unpack .../2-fmt_1%3a11.2.0_aarch64.deb ...
+Unpacking fmt (1:11.2.0) ...
+Selecting previously unselected package liblz4.
+Preparing to unpack .../3-liblz4_1.10.0-1_aarch64.deb ...
+Unpacking liblz4 (1.10.0-1) ...
+Selecting previously unselected package libprotobuf.
+Preparing to unpack .../4-libprotobuf_2%3a33.1-1_aarch64.deb ...
+Unpacking libprotobuf (2:33.1-1) ...
+Selecting previously unselected package zstd.
+Preparing to unpack .../5-zstd_1.5.7-1_aarch64.deb ...
+Unpacking zstd (1.5.7-1) ...
+Selecting previously unselected package android-tools.
+Preparing to unpack .../6-android-tools_35.0.2-7_aarch64.deb ...
+Unpacking android-tools (35.0.2-7) ...
+Setting up fmt (1:11.2.0) ...
+Setting up liblz4 (1.10.0-1) ...
+Setting up zstd (1.5.7-1) ...
+Setting up abseil-cpp (20250814.1) ...
+Setting up brotli (1.2.0) ...
+Setting up libprotobuf (2:33.1-1) ...
+Setting up android-tools (35.0.2-7) ...
+~ $
+
+#### Step 5 - pair Termux's adb with the phone (Settings and Termux in split screen,
+#### numbers typed from the "Pair device with pairing code" dialog)
+
+~ $ adb pair 172.20.10.10:46285 934495
+* daemon not running; starting now at tcp:5037
+* daemon started successfully
+Successfully paired to 172.20.10.10:46285 [guid=adb-R5GYC5E7KTJ-ktZCd0]
+~ $
+
+#### Step 6 - connect over Wireless debugging (port 45245 from screenshot 05) and
+#### switch adbd into legacy TCP mode on port 5555
+
+~ $ adb connect 172.20.10.10:45245
+connected to 172.20.10.10:45245
+~ $ adb -s 172.20.10.10:45245 tcpip 5555
+restarting in TCP mode port: 5555
+~ $
+
+#### Step 7 - verify port 5555 over the phone's own loopback address
+
+~ $ adb connect 127.0.0.1:5555
+connected to 127.0.0.1:5555
+~ $ adb devices
+List of devices attached
+127.0.0.1:5555  device
+172.20.10.10:45245      offline
+
+~ $ adb disconnect 172.20.10.10:45245
+error: no such device '172.20.10.10:45245'
+~ $
+
+#### Step 8 - Wi-Fi turned OFF (phone on 5G only); port 5555 must still work
+
+~ $ echo WiFi is now off
+WiFi is now off
+~ $ adb disconnect
+disconnected everything
+~ $ adb connect 127.0.0.1:5555
+connected to 127.0.0.1:5555
+~ $ adb devices
+List of devices attached
+127.0.0.1:5555  device
+
+~ $
+
+#### Step 9 - open the reverse SSH tunnel to the workstation.
+#### The first password attempt was mistyped; the second was accepted, after
+#### which ssh prints nothing and keeps running (that silence is success).
+
+~ $ pkg install openssh
+openssh is already the newest version (10.3p1-1).
+Summary:
+  Upgrading: 0, Installing: 0, Removing: 0, Not Upgrading: 22
+~ $ termux-wake-lock
+~ $ ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+user@ronenzyroff.com's password:
+Permission denied, please try again.
+user@ronenzyroff.com's password:
+
+#### (second password accepted - no further output, tunnel running)
+
+#### Step 10 - on the Ubuntu workstation (output NOT captured during the session):
+####   adb connect 127.0.0.1:7555
+####   adb devices
+#### Expected: "127.0.0.1:7555  device" after tapping Allow on the phone's
+#### "Allow USB debugging?" prompt for the workstation's key.
