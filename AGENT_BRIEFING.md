@@ -4,6 +4,12 @@
 running on the owner's Ubuntu workstation (`ronenzyroff.com`). The owner will
 point you here. Read all of it before touching the phone.*
 
+> **Update 05/10/2026: the tunnels now heal themselves.** Two Termux loops keep `127.0.0.1:7555` **and** `127.0.0.1:7556` open, and reconnect by themselves after the nightly router restart or a network change.
+> - **On the workstation:** sshd frees a dead session's port after ~90 s, and a user service re-attaches adb.
+> - **Before asking the owner to restart anything, wait 2–3 minutes and try the other port.**
+> - Details: [docs/self-healing-tunnels.md](docs/self-healing-tunnels.md).
+> - **The owner asked for this setup,** including the sshd change below and the password stored in Termux. The section 4 rule about not changing the SSH server still applies to any *further* change.
+
 ## 1. What changed
 
 **Before:** the phone was plugged into this workstation by **USB**. `adb` saw
