@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep adb attached to the phone's reverse SSH tunnels (127.0.0.1:7555)
+
+[Service]
+ExecStart=/home/user/.local/bin/phone_adb_reconnect.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,18 @@
+#!/bin/bash
+# /usr/local/sbin/phone_tunnel_takeover PORT CALLER_SSHD_PID   (run as root via sudo, from the
+# phone tunnel's forced command). Ensures the phone's NEWEST tunnel session owns 127.0.0.1:PORT:
+# if an older session of the same account still holds the port (the phone's previous, dead
+# connection), end it. Never ends a session that has anything but the tunnel under it.
+set -u
+PORT="${1:-}"; ME="${2:-}"
+[ "$PORT" = "7555" ] || { echo "bad-port"; exit 2; }
+[[ "$ME" =~ ^[0-9]+$ ]] || { echo "bad-pid"; exit 2; }
+holder=$(ss -ltnpH "sport = :$PORT" | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2)
+[ -z "$holder" ] && { echo none; exit 0; }
+[ "$holder" = "$ME" ] && { echo mine; exit 0; }
+huser=$(ps -o user= -p "$holder" | tr -d ' '); hcmd=$(ps -o cmd= -p "$holder")
+[ "$huser" = "user" ] && [[ "$hcmd" == "sshd: user"* ]] && [[ "$hcmd" != *priv* ]] || { echo "foreign"; exit 3; }
+others=$(ps --ppid "$holder" -o cmd= | grep -v -E '^(sleep infinity|/bin/bash /usr/local/bin/phone_tunnel_session)$' | grep -c .)
+[ "$others" -eq 0 ] || { echo "has-children"; exit 4; }
+kill "$holder"; logger -t phone_tunnel "port $PORT: ended stale session pid $holder; newest is $ME"
+echo killed; exit 0

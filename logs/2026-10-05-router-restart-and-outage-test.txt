@@ -1,0 +1,88 @@
+04:45:10 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:45:26 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:45:41 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:45:57 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:46:12 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:46:27 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:46:42 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:46:58 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:47:13 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:47:29 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:47:44 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:47:59 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:48:14 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:48:29 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:48:45 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:49:00 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:49:15 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:49:30 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:49:46 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:50:01 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:50:16 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:50:31 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:50:47 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:51:02 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:51:17 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:51:32 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:51:48 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:52:03 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:52:19 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:52:34 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:52:49 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:53:05 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:53:20 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:53:35 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:53:50 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:54:21 internet=DOWN L7555=1 adb7555= | L7556=1 adb7556=
+04:54:52 internet=DOWN L7555=1 adb7555= | L7556=1 adb7556=
+04:55:23 internet=DOWN L7555=1 adb7555= | L7556=1 adb7556=
+04:55:46 internet=DOWN L7555=1 adb7555= | L7556=1 adb7556=adb: device offline
+04:56:01 internet=DOWN L7555=0 adb7555=adb: device offline | L7556=0 adb7556=adb: device offline
+04:56:20 internet=DOWN L7555=0 adb7555=adb: device offline | L7556=0 adb7556=adb: device offline
+04:56:35 internet=up L7555=0 adb7555=adb: device offline | L7556=0 adb7556=adb: device offline
+04:56:50 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:57:06 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:57:21 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:57:36 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:57:51 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:58:07 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:58:22 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:58:37 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:58:52 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:59:08 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:59:23 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:59:38 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+04:59:53 internet=up L7555=0 adb7555=adb: device offline | L7556=1 adb7556=ok
+05:00:08 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:00:24 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:00:39 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:00:54 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:01:09 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:01:25 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:01:40 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:01:55 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:02:10 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:02:26 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:02:41 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:02:56 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:03:11 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:03:26 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:03:42 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:03:57 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:04:12 internet=up L7555=1 adb7555=ok | L7556=1 adb7556=ok
+05:04:31 internet=up L7555=1 adb7555=ok
+05:04:47 internet=up L7555=1 adb7555=ok
+05:05:10 internet=up L7555=1 adb7555=
+05:05:33 internet=up L7555=1 adb7555=
+05:05:56 internet=up L7555=1 adb7555=
+05:06:19 internet=up L7555=1 adb7555=
+05:06:42 internet=up L7555=1 adb7555=
+05:07:05 internet=up L7555=1 adb7555=
+05:07:28 internet=up L7555=1 adb7555=
+05:07:51 internet=up L7555=1 adb7555=
+05:08:14 internet=up L7555=1 adb7555=
+05:08:37 internet=up L7555=1 adb7555=
+05:09:00 internet=up L7555=1 adb7555=
+05:09:15 internet=up L7555=1 adb7555=ok
+05:09:31 internet=up L7555=1 adb7555=ok
+05:09:46 internet=up L7555=1 adb7555=ok

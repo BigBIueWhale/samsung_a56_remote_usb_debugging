@@ -1,0 +1,19 @@
+#!/bin/bash
+# /usr/local/bin/phone_tunnel_session : the forced command of the phone's tunnel key
+# (/etc/ssh/phone_tunnel_authorized_keys). The phone connects with -R 7555:127.0.0.1:5555.
+# If this session got the port, it just stays open. If an older dead session still holds it,
+# that one is ended and we exit, so the phone reconnects at once and gets the port.
+PORT=7555
+p=$$; me=""
+for i in 1 2 3 4 5 6; do
+  p=$(ps -o ppid= -p "$p" | tr -d ' '); [ -z "$p" ] || [ "$p" -le 1 ] && break
+  c=$(ps -o cmd= -p "$p"); if [[ "$c" == "sshd: user"* && "$c" != *priv* ]]; then me=$p; break; fi
+done
+sleep 1
+r=$(sudo -n /usr/local/sbin/phone_tunnel_takeover "$PORT" "${me:-0}" 2>&1)
+logger -t phone_tunnel "session ${me:-?}: takeover -> $r"
+case "$r" in
+  mine) exec sleep infinity ;;
+  killed) exit 75 ;;
+  *) exit 76 ;;
+esac

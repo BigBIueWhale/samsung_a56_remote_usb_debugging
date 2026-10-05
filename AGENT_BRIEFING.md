@@ -4,11 +4,13 @@
 running on the owner's Ubuntu workstation (`ronenzyroff.com`). The owner will
 point you here. Read all of it before touching the phone.*
 
-> **Update 05/10/2026: the tunnels now heal themselves.** Two Termux loops keep `127.0.0.1:7555` **and** `127.0.0.1:7556` open, and reconnect by themselves after the nightly router restart or a network change.
-> - **On the workstation:** sshd frees a dead session's port after ~90 s, and a user service re-attaches adb.
-> - **Before asking the owner to restart anything, wait 2–3 minutes and try the other port.**
-> - Details: [docs/self-healing-tunnels.md](docs/self-healing-tunnels.md).
-> - **The owner asked for this setup,** including the sshd change below and the password stored in Termux. The section 4 rule about not changing the SSH server still applies to any *further* change.
+> **Update 2026-10-05: the tunnel heals itself.** Termux runs `~/.tunnel/tunnel.sh`, a loop that logs in with a phone-only restricted key and holds **127.0.0.1:7555**.
+> - **It survives up to 5 minutes of silence** without dropping (the nightly router restart is up to ~4 minutes).
+> - **If a session dies anyway,** the phone's newest connection takes over the port.
+> - **adb re-attaches itself** (`phone-adb-reconnect.service`).
+> - **So before telling the owner anything, wait up to 5–10 minutes** and check `journalctl -t phone_tunnel --since -15min`.
+> - Design and rules: [docs/self-healing-tunnels.md](docs/self-healing-tunnels.md).
+> - **Never run `/usr/local/sbin/phone_tunnel_takeover` by hand:** with a wrong PID it ends the live session (it happened once, while testing).
 
 ## 1. What changed
 
@@ -130,23 +132,20 @@ stopped it.
 
 > The phone's tunnel to the workstation is down. Please, on the phone:
 >
-> 1. Open **Termux**. If an old `ssh` command is still on screen, press
->    **Ctrl+C**.
+> 1. Open **Termux** (open a new session from the left drawer if the current one is busy).
 > 2. Run:
 >
 >    ```
 >    termux-wake-lock
->    ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
+>    nohup bash ~/.tunnel/tunnel.sh >/dev/null 2>&1 &
 >    ```
 >
->    If WireGuard is on, use `user@172.30.77.1` instead of
->    `user@ronenzyroff.com`.
-> 3. Type the password. When it goes silent, leave it running and tell me to
->    continue.
+>    It logs in with the phone's key by itself; no password is needed. Its log is `~/.tunnel/log`.
+> 3. Tell me to continue.
 >
-> If Termux prints `remote port forwarding failed for listen port 7555`, an old
-> tunnel is still holding the port on the workstation. Tell me, and I'll free
-> it, or we'll switch to port 7556.
+> *(Fallback, the original manual way, still works: `ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@172.30.77.1` with the account password.)*
+
+**Since 2026-10-05, "port already taken" fixes itself:** a new tunnel session ends the dead one holding 7555 (`journalctl -t phone_tunnel` shows "ended stale session"). The manual steps below are only for the password fallback.
 
 **Freeing the port yourself (agent).** This is allowed. It ends only a dead
 session of the same `user` account, and changes no configuration.

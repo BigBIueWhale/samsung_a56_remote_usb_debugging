@@ -1,0 +1,3 @@
+# The Galaxy A56's adb tunnel key (generated on the phone in Termux, 05/10/2026). It can do nothing but
+# listen on 127.0.0.1:7555 for the phone, through the forced command below.
+restrict,port-forwarding,permitlisten="7555",permitopen="127.0.0.1:9",command="/usr/local/bin/phone_tunnel_session" ssh-ed25519 <THE PHONE'S PUBLIC KEY FROM install.sh keygen> a56-termux-adb-tunnel

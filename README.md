@@ -21,6 +21,13 @@ doesn't depend on it being secret (see [Security model](#10-security-model)).
 >   [Step 10](#step-10--connect-from-the-workstation-the-agents-side) and
 >   [`logs/workstation-session.txt`](logs/workstation-session.txt).
 
+> **Update 2026-10-05: the tunnel heals itself.**
+> - **Termux runs a reconnect loop** that logs in with a phone-only, restricted key.
+> - **Both sides tolerate 5 minutes of silence,** so the nightly router restart (up to ~4 minutes) only pauses the link on 127.0.0.1:7555.
+> - **If a session does die,** the phone's newest connection takes the port over from it.
+> - **adb re-attaches itself** on the workstation.
+> - **Nothing needs doing** between phone reboots. Full design: [`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md).
+
 ---
 
 ## Contents
@@ -49,7 +56,7 @@ flowchart LR
         L7555 --- SSHD["sshd on 0.0.0.0:22"]
     end
     subgraph PH["Galaxy A56 on 5G"]
-        SSHC["Termux: ssh -N -R 7555:127.0.0.1:5555"] --> ADBD["adbd on 127.0.0.1:5555<br/>(legacy TCP mode)"]
+        SSHC["Termux: ~/.tunnel/tunnel.sh (since 2026-10-05)<br/>loop: ssh -T -i id_tunnel -R 7555:127.0.0.1:5555"] --> ADBD["adbd on 127.0.0.1:5555<br/>(legacy TCP mode)"]
     end
     SSHC ==>|"SSH connection started BY THE PHONE<br/>(internet, or optionally inside WireGuard)"| SSHD
 ```
@@ -560,6 +567,8 @@ inside the adb connection. The lower size and bit rate suit 5G upload speeds.
 
 ### Each time you want the agent to have the phone (no reboot since the last setup)
 
+**Since 2026-10-05: nothing.** `~/.tunnel/tunnel.sh` keeps the tunnel up by itself ([`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md)). The steps below are the original manual way, still usable as a fallback; password login is unchanged.
+
 1. **Optional: turn WireGuard on** for a more persistent connection
    ([§4.5](#45-wireguard-is-optional)).
 2. In Termux, open the tunnel. Use `user@172.30.77.1` instead if WireGuard is
@@ -596,6 +605,7 @@ A reboot closes port 5555. Redo the bootstrap:
    **Pairing (Step 5) is not needed again** unless you pressed Forget or
    revoked authorizations.
 4. Turn Wi-Fi off if you like. Port 5555 now lasts until the next reboot.
+5. **Restart the self-healing tunnel** in Termux: `termux-wake-lock`, then `nohup bash ~/.tunnel/tunnel.sh >/dev/null 2>&1 &`. The key in `~/.tunnel/` survives reboots.
 
 **Cable alternative (at home):** plug the phone into the workstation by USB and
 run `adb -d tcpip 5555`, then unplug. `-d` means "the USB-connected device".
@@ -613,7 +623,7 @@ run `adb -d tcpip 5555`, then unplug. `-d` means "the USB-connected device".
 | `error: no such device` on `adb disconnect <ip:port>` | Entry already gone | Harmless |
 | `127.0.0.1:5555` refused **in Termux** | Phone rebooted (port reset), or USB debugging was turned off | Redo the reboot routine ([§8](#after-the-phone-reboots)) and keep USB debugging on |
 | ssh: `Permission denied, please try again.` | Wrong password (it doesn't echo; phone keyboard may auto-capitalize) | Type it again carefully; after 3 failures, rerun the command |
-| ssh: `Error: remote port forwarding failed for listen port 7555` (then exits) | The workstation still holds 7555 for an **old tunnel's sshd session** that hasn't noticed the phone left (happened on 2026-09-28; see [§9.1](#91-a-stale-tunnel-after-a-network-drop-2026-09-28)) | On the workstation, end the stale forwarding-only `sshd: user` session (steps in §9.1), then rerun ssh in Termux. Or use another port, such as `-R 7556:…` and `adb connect 127.0.0.1:7556`. |
+| ssh: `Error: remote port forwarding failed for listen port 7555` (then exits) | The workstation still holds 7555 for an **old tunnel's sshd session** that hasn't noticed the phone left (happened on 2026-09-28; see [§9.1](#91-a-stale-tunnel-after-a-network-drop-2026-09-28)) | **Since 2026-10-05 this is handled automatically:** the newest connection takes over the port ([self-healing](docs/self-healing-tunnels.md)). For the manual way: end the stale forwarding-only `sshd: user` session (steps in §9.1), then rerun ssh in Termux. |
 | ssh: `Software caused connection abort` / `client_loop: send disconnect: Broken pipe` | The phone's mobile connection dropped during login or the session | Just run the ssh command again; turn on WireGuard for persistence |
 | Workstation: `get-state` says `device`, but every `adb shell` hangs until a timeout | The SSH leg died silently. The workstation's listener and adb's connection look alive, but nothing reaches the phone. | Restart the tunnel in Termux (Ctrl+C, rerun ssh). If Termux then reports `remote port forwarding failed`, see the row above. |
 | Workstation: `failed to connect to 127.0.0.1:7555` / `Connection refused` | Tunnel isn't up | Check Termux: ssh must be running silently |
@@ -686,12 +696,10 @@ Full verbatim log:
 **No reboot or re-bootstrap was needed.** adbd's port 5555 on the phone had
 stayed open throughout; only the SSH leg had died.
 
-**Possible prevention (not applied; it's the owner's call).** Setting
-`ClientAliveInterval 30` and `ClientAliveCountMax 3` in the workstation's sshd
-configuration would make sshd drop a dead session after about 90 seconds,
-freeing the port on its own. That's a change to
-[personal_server](https://github.com/BigBIueWhale/personal_server)'s SSH
-setup, so it isn't made here.
+**Prevention: applied on 2026-10-05, at the owner's request.**
+- **sshd notices dead sessions:** `ClientAliveInterval 15` × `ClientAliveCountMax 20`, so silence is tolerated for 5 minutes. That's long enough to survive the nightly router restart, short enough to end a truly dead session.
+- **The newest connection replaces a dead one at once,** through the tunnel key's forced command.
+- Details: [`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md).
 
 ---
 
@@ -704,8 +712,8 @@ The protection comes from real controls, not from hiding anything:
    exactly one account, by password.
    - This is personal_server's deliberate choice. Its README explains the
      trade-off.
-   - The tunnel therefore can't reconnect unattended unless the password is
-     stored on the phone. We don't store it; it's typed each time.
+   - **Since 2026-10-05 the tunnel doesn't use the password.** It uses a phone-only ed25519 key, generated on the phone.
+   - The workstation accepts keys only from the root-owned `/etc/ssh/phone_tunnel_authorized_keys`. That key is restricted to listening on 7555 through a forced command: no shell, PTY or other forwarding ([details](docs/self-healing-tunnels.md#security)).
 2. **Loopback-only on the workstation.**
    - The forwarded port is `127.0.0.1:7555` (server default
      `GatewayPorts no`), so only processes on the workstation itself can use
@@ -764,14 +772,8 @@ Things to keep in mind:
 
 - **Reboot = redo the bootstrap** (needs a Wi-Fi client connection for a
   minute, or a USB cable). Non-rooted phones can't make port 5555 persistent.
-- **Password-only SSH means no unattended reconnection.**
-  - Automatic reconnection would need either the password stored on the phone
-    (not recommended) or a change to personal_server's SSH policy (for
-    example, a key allowed only to forward one port).
-  - personal_server's setup currently refuses anything but one password-only
-    account.
-- **Without WireGuard, a network switch drops the SSH session.** Rerun the
-  ssh command, or use WireGuard for persistence.
+- **Unattended reconnection: solved on 2026-10-05** with a restricted key ([self-healing](docs/self-healing-tunnels.md)). It survives outages of up to 5 minutes without dropping; longer ones reconnect by themselves.
+- **Without WireGuard, a network switch kills the SSH session.** The loop then reconnects, but only after the 5-minute silence limit. Keep WireGuard on for instant survival.
 - **mDNS auto-discovery never works through the tunnel,** so IP:port values
   are always typed by hand
   ([why](docs/android-research.md#6-service-discovery-mdns-and-manual-ipport)).
@@ -803,7 +805,12 @@ logs/
   workstation-session.txt               the workstation side (Step 10), run by the AI agent:
                                         connection checks, the phone's build, measured speed
   2026-09-28-stale-tunnel-incident.txt  a dead tunnel holding port 7555, and how it was freed (§9.1)
+scripts/
+  phone/                                tunnel.sh (the reconnect loop) and install.sh (keygen, start)
+  workstation/                          sshd drop-in, restricted-key file example, forced command,
+                                        takeover helper, sudoers rule, adb reconnect service, logger
 docs/
+  self-healing-tunnels.md               the self-healing tunnel (2026-10-05): design, security, tests
   why-not-directly-over-wireguard.md    why the VPN can't be used for workstation→phone
                                         connections (firewall analysis, exact line links)
   android-research.md                   AOSP source quotes, Samsung/Google policy notes,
