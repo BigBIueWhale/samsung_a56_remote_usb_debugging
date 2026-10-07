@@ -69,6 +69,13 @@ listed.
   tap, six digits and Back while RustDesk had come to the front; the tap most
   likely started a connection to the owner's computer, and where the digits
   went couldn't be proved.
+- **Never send input while a call is ringing or active, or while the call
+  screen is in front.** Check `dumpsys telephony.registry | grep -m1
+  mCallState` (0 = idle) together with the foreground app before every input;
+  an incoming call can take the screen between your check and your keystroke.
+  On 2026-10-07 at 15:40 an Enter sent about 8 seconds after a call began
+  ringing may have answered it (the call was "answered from the call screen" at
+  that second and lasted 86 seconds with nobody speaking).
 
 ## 4. Never do these (they cut the link, and only the human can restore it)
 
