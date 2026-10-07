@@ -57,6 +57,18 @@ listed.
   timed out, you don't know whether it took effect on the phone. After
   reconnecting, check the current state (screenshot, UI dump) before
   continuing. Never blindly repeat an action that may already have happened.
+- **Check which app is in front immediately before every tap or keystroke**
+  (`dumpsys window | grep -m1 mCurrentFocus`). The owner may be using the
+  phone at the same moment, and an app can come to the front between two of
+  your commands. Bring apps forward with `am start` only.
+- **Never send input while RustDesk (`com.carriez.flutter_hbb`) is in front.**
+  The phone's RustDesk is a *client* to the owner's computers: a tap there can
+  start a remote session, and keystrokes in a session go to that computer.
+  Leave it running in the background (bring your app forward with `am start`)
+  and return to it with `am start` only. On 2026-10-07 at 12:13 an agent sent a
+  tap, six digits and Back while RustDesk had come to the front; the tap most
+  likely started a connection to the owner's computer, and where the digits
+  went couldn't be proved.
 
 ## 4. Never do these (they cut the link, and only the human can restore it)
 
