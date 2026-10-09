@@ -13,8 +13,7 @@
   - Fake announcements can't make adb connect anywhere.
   - The parser is memory-safe Rust.
   - **Three availability bugs** remain (below). At worst, a remote sender can stop discovery or grow the adb server's memory.
-- **Fix:** start the adb server with **`ADB_MDNS=0`**, which closes the port. [How](#the-fix-adb_mdns0).
-- **Status (2026-10-10): the fix is not applied yet.** The running adb server (started 2026-09-28) still listens on 5353.
+- **Fix: applied on 2026-10-10.** The adb server now starts with **`ADB_MDNS=0`**, so nothing listens on 5353 any more. [How, and the check](#the-fix-adb_mdns0).
 
 ## How it was found
 
@@ -149,13 +148,35 @@ None of them reaches adb's connection to the phone or runs code.
      Environment=ADB_MDNS=0
      ```
      then run `systemctl --user daemon-reload && systemctl --user restart phone-adb-reconnect`.
-  2. **Terminals and agents:** add `export ADB_MDNS=0` to the shell startup file they read (e.g. `~/.bashrc`).
-  3. **Restart the server once:** after steps 1 and 2, run `adb kill-server` from a new terminal. The reconnect service starts a new server within ~20 s and reconnects `127.0.0.1:7555`.
+  2. **Terminals and agents:** add `export ADB_MDNS=0` to `~/.bashrc` (interactive shells) and `~/.profile` (login shells, SSH, and the desktop session).
+  3. **Restart the server once, from a shell that already has the variable,** so no other `adb` command can start a server without it first:
+     ```
+     export ADB_MDNS=0
+     adb kill-server && adb start-server && adb connect 127.0.0.1:7555
+     ```
+     If `connect` loses a race with the reconnect service, the service attaches the phone within ~20 s anyway.
 - **Verify:**
   ```
-  ss -ulnp | grep 5353                     # no adb lines
+  ss -uanp | grep adb                      # nothing: adb has no UDP sockets at all
   adb mdns check                           # ERROR: mdns discovery disabled
-  tr '\0' '\n' < /proc/$(pgrep -f 'adb .*fork-server')/environ | grep ADB_MDNS   # ADB_MDNS=0
+  P=$(ss -ltnpH 'sport = :5037' | grep -o 'pid=[0-9]*' | cut -d= -f2)
+  tr '\0' '\n' < /proc/$P/environ | grep ADB_MDNS                    # ADB_MDNS=0
   ```
   `adb mdns check` prints that exact message when discovery is off ([`transport_mdns.cpp` L150-152](https://android.googlesource.com/platform/packages/modules/adb/+/ad269d7d8b925f8e1a98c099d6f71ab211e9de34/client/transport_mdns.cpp#150)).
 - **It costs nothing here.** The phone is always reached by IP:port through the tunnel.
+
+### Applied on the workstation (2026-10-10, 02:42)
+
+- **Steps 1–3 were done as written above.** The service file in [`scripts/workstation/`](../scripts/workstation/phone-adb-reconnect.service) now has the `Environment=` line.
+- **The check afterwards:**
+  ```
+  $ ss -uanp | grep -c adb
+  0
+  $ adb mdns check
+  ERROR: mdns discovery disabled
+  $ tr '\0' '\n' < /proc/2507013/environ | grep ADB_      # the server on 127.0.0.1:5037
+  ADB_MDNS=0
+  $ adb devices -l
+  127.0.0.1:7555         device product:a56xnaxx model:SM_A566B device:a56x transport_id:2
+  ```
+- **The phone link was back within seconds.** `adb -s 127.0.0.1:7555 shell getprop ro.product.model` returned `SM-A566B`.

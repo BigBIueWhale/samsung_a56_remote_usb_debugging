@@ -762,11 +762,11 @@ Things to keep in mind:
   ([details](docs/android-research.md#10-known-risks-and-pending-changes)).
   Wireless debugging is only needed briefly for the bootstrap and switches
   itself off when you leave Wi-Fi.
-- **The workstation's adb server listens on UDP 5353 (mDNS discovery) on every
-  interface.** It's on by default and unused here.
+- **By default, the workstation's adb server listens on UDP 5353 (mDNS
+  discovery) on every interface.** This setup doesn't use it.
   - Audit 2026-10-10: no way in. The parser is memory-safe Rust, adb sends no reply, and fake announcements can't make it connect anywhere.
   - Three availability bugs: one packet stops discovery, and floods grow adb's memory.
-  - Close the port by starting the adb server with `ADB_MDNS=0`. Not applied yet as of 2026-10-10.
+  - **Closed on 2026-10-10:** the adb server now starts with `ADB_MDNS=0` (set in `phone-adb-reconnect.service`, `~/.bashrc` and `~/.profile`), so nothing listens on 5353.
   - Details, bugs and exact source lines: [`docs/adb-mdns-port-5353.md`](docs/adb-mdns-port-5353.md).
 - **Anyone with this workstation account controls the phone** while the tunnel
   is up. That includes an AI agent you run there, which is the point of the

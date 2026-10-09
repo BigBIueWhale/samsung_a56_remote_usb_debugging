@@ -2,6 +2,8 @@
 Description=Keep adb attached to the phone's reverse SSH tunnels (127.0.0.1:7555)
 
 [Service]
+# adb server: no mDNS discovery, so nothing listens on UDP 5353 (docs/adb-mdns-port-5353.md)
+Environment=ADB_MDNS=0
 ExecStart=/home/user/.local/bin/phone_adb_reconnect.sh
 Restart=always
 RestartSec=10
