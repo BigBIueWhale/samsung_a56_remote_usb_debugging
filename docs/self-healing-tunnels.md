@@ -85,11 +85,9 @@ There are three parts.
   - `journalctl -t phone_tunnel --since -1h`;
   - `systemctl --user status phone-adb-reconnect`.
 - **Phone log:** `~/.tunnel/log` in Termux.
-- **After a phone reboot:**
-  1. Port 5555 is gone, as before, so redo the Wireless-debugging bootstrap (README §8).
-  2. Then in Termux: `bash ~/.tunnel/tunnel.sh` under `nohup`, or rerun `install.sh start`.
-  3. The key stays.
-- **Stop:** `pkill -f .tunnel/tunnel.sh` in Termux.
+- **When it's down:** [the recovery card](../AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner). Part A restarts the loop in Termux; part B, the Wireless-debugging bootstrap, is only for a reboot, which closes port 5555. The key survives both.
+- **The loop doesn't survive Termux being killed.** Android has SIGKILLed Termux while the phone stayed up (23/10, 29/10, 06/11 and 09/11/2026; killer unknown, [README §9.2](../README.md#92-termux-killed-while-the-phone-stayed-up-2026-11-09)). The loop then dies without writing an `exit` line, so a log whose last line is an old `connect` doesn't prove it's holding: check the workstation's listener.
+- **Stop:** `pkill -f .tunnel/tunnel.sh` in Termux (and `pkill -f .tunnel/id_tunnel` for its ssh).
 - **If the WireGuard endpoint IP ever changed** (it hasn't across the nightly restarts), the phone's WireGuard app might need a toggle. That's the owner's to do. Meanwhile the loop falls back to `ronenzyroff.com`.
 
 ## History of 2026-10-05

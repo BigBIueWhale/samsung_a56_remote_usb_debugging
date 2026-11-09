@@ -28,6 +28,8 @@ doesn't depend on it being secret (see [Security model](#10-security-model)).
 > - **adb re-attaches itself** on the workstation.
 > - **Nothing needs doing** between phone reboots. Full design: [`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md).
 
+> **Update 2026-11-09: when it's down, use one card.** Android sometimes kills Termux while the phone stays up, and the tunnel dies with it. [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner) in `AGENT_BRIEFING.md` brings it back: part A (Termux only) for a killed Termux, part B (Wi-Fi bootstrap) only after a reboot. **Wireless debugging being OFF is normal** off Wi-Fi and is never the cause ([§9.2](#92-termux-killed-while-the-phone-stayed-up-2026-11-09)).
+
 ---
 
 ## Contents
@@ -229,6 +231,9 @@ workstation avoids that confusion. On the phone side the port stays 5555.
    settings, add Termux to **Never sleeping apps**: Settings → Battery →
    Background usage limits (menu names vary slightly between One UI versions).
    The `termux-wake-lock` command used later helps too.
+   Even so, Android has killed Termux (SIGKILL) while the phone stayed up:
+   23/10, 29/10, 06/11 and 09/11/2026, killer unknown. Part A of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner)
+   restarts it ([§9.2](#92-termux-killed-while-the-phone-stayed-up-2026-11-09)).
 6. **Optional: turn off Samsung's automatic restarts,** because a reboot closes
    port 5555. Look under Settings → Device care → Auto optimization → "Restart
    when needed", and any scheduled auto-restart. Menu names vary slightly
@@ -565,50 +570,21 @@ inside the adb connection. The lower size and bit rate suit 5G upload speeds.
 
 ## 8. Routine: every time, and after every reboot
 
-### Each time you want the agent to have the phone (no reboot since the last setup)
+### Each time you want the agent to have the phone
 
-**Since 2026-10-05: nothing.** `~/.tunnel/tunnel.sh` keeps the tunnel up by itself ([`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md)). The steps below are the original manual way, still usable as a fallback; password login is unchanged.
+**Nothing.** `~/.tunnel/tunnel.sh` keeps the tunnel up by itself ([`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md)).
 
-1. **Optional: turn WireGuard on** for a more persistent connection
-   ([§4.5](#45-wireguard-is-optional)).
-2. In Termux, open the tunnel. Use `user@172.30.77.1` instead if WireGuard is
-   on:
+### When the link is down: Termux killed, or the phone rebooted
 
-   ```sh
-   termux-wake-lock
-   ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@ronenzyroff.com
-   ```
-
-3. Type the password. It goes silent; leave it running.
-4. On the workstation: `adb connect 127.0.0.1:7555`.
-
-**To stop:** press **Ctrl+C** in Termux (Termux's extra-keys row has CTRL),
-then run `termux-wake-unlock`.
-
-### After the phone reboots
-
-A reboot closes port 5555. Redo the bootstrap:
-
-1. **Join any Wi-Fi as a client.** Your own hotspot doesn't count.
-   - If it's a network you ticked "Always allow" on (for example the same
-     friend's hotspot), there's no prompt.
-   - Otherwise, tap Allow as in Step 2.
-2. Turn on **Wireless debugging**, open its page, and read the new
-   **IP address & Port**.
-3. In Termux, using the new values from that page:
-
-   ```sh
-   adb connect <IP>:<PORT>
-   adb -s <IP>:<PORT> tcpip 5555
-   ```
-
-   **Pairing (Step 5) is not needed again** unless you pressed Forget or
-   revoked authorizations.
-4. Turn Wi-Fi off if you like. Port 5555 now lasts until the next reboot.
-5. **Restart the self-healing tunnel** in Termux: `termux-wake-lock`, then `nohup bash ~/.tunnel/tunnel.sh >/dev/null 2>&1 &`. The key in `~/.tunnel/` survives reboots.
+Use [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner): part A in Termux; part B, the Wi-Fi bootstrap of Steps 2, 3, 6 and 7, only if `127.0.0.1:5555` is refused, which means a reboot. Pairing (Step 5) is not needed again unless `failed to authenticate` says so. Port 5555 then lasts until the next reboot, and the key in `~/.tunnel/` survives reboots.
 
 **Cable alternative (at home):** plug the phone into the workstation by USB and
 run `adb -d tcpip 5555`, then unplug. `-d` means "the USB-connected device".
+Then part A of the card in Termux.
+
+**Password fallback** (if the phone's key ever fails): in Termux,
+`ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -R 7555:127.0.0.1:5555 user@172.30.77.1`
+and the account password.
 
 ---
 
@@ -616,19 +592,22 @@ run `adb -d tcpip 5555`, then unplug. `-d` means "the USB-connected device".
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| **Wireless debugging is OFF** whenever you look | Normal: Android turns it off whenever the phone isn't on Wi-Fi | Nothing. The link uses port 5555, not Wireless debugging |
+| Link down, phone still up; `dumpsys activity exit-info com.termux` shows `reason=2 (SIGNALED)` at the drop | Android killed Termux, and the tunnel loop with it (killer unknown) | Part A of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner) ([§9.2](#92-termux-killed-while-the-phone-stayed-up-2026-11-09)) |
+| `emulator-5554  device` in Termux's `adb devices` | Termux's adb also lists the phone's own port 5555 under an emulator name | Harmless: it's the same phone |
 | Toast **"Please connect to a Wi-Fi network"** when turning on Wireless debugging | Phone is on mobile data (or hosting its own hotspot) | Join any Wi-Fi as a client ([Step 2](#step-2--join-any-wi-fi-as-a-client-and-allow-wireless-debugging-on-it)) |
 | Pairing dialog vanishes / `adb pair` fails | You switched away from Settings, which kills the dialog and its code | Use split screen ([Step 5](#step-5--pair-termuxs-adb-with-the-phone)) and read fresh numbers |
 | `failed to connect` to the Wireless debugging port | Wireless debugging restarted, so the port changed | Read the current port on the Wireless debugging page |
 | `offline` entry after `tcpip 5555` | Stale entry from before adbd restarted | Ignore it; `adb disconnect` clears it |
 | `error: no such device` on `adb disconnect <ip:port>` | Entry already gone | Harmless |
-| `127.0.0.1:5555` refused **in Termux** | Phone rebooted (port reset), or USB debugging was turned off | Redo the reboot routine ([§8](#after-the-phone-reboots)) and keep USB debugging on |
+| `127.0.0.1:5555` refused **in Termux** | Phone rebooted (port reset), or USB debugging was turned off | Part B of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner); keep USB debugging on |
 | ssh: `Permission denied, please try again.` | Wrong password (it doesn't echo; phone keyboard may auto-capitalize) | Type it again carefully; after 3 failures, rerun the command |
 | ssh: `Error: remote port forwarding failed for listen port 7555` (then exits) | The workstation still holds 7555 for an **old tunnel's sshd session** that hasn't noticed the phone left (happened on 2026-09-28; see [§9.1](#91-a-stale-tunnel-after-a-network-drop-2026-09-28)) | **Since 2026-10-05 this is handled automatically:** the newest connection takes over the port ([self-healing](docs/self-healing-tunnels.md)). For the manual way: end the stale forwarding-only `sshd: user` session (steps in §9.1), then rerun ssh in Termux. |
 | ssh: `Software caused connection abort` / `client_loop: send disconnect: Broken pipe` | The phone's mobile connection dropped during login or the session | Just run the ssh command again; turn on WireGuard for persistence |
-| Workstation: `get-state` says `device`, but every `adb shell` hangs until a timeout | The SSH leg died silently. The workstation's listener and adb's connection look alive, but nothing reaches the phone. | Restart the tunnel in Termux (Ctrl+C, rerun ssh). If Termux then reports `remote port forwarding failed`, see the row above. |
-| Workstation: `failed to connect to 127.0.0.1:7555` / `Connection refused` | Tunnel isn't up | Check Termux: ssh must be running silently |
+| Workstation: `get-state` says `device`, but every `adb shell` hangs until a timeout | The SSH leg died silently. The workstation's listener and adb's connection look alive, but nothing reaches the phone. | Part A of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner) (restarts the loop; the takeover frees 7555) |
+| Workstation: `failed to connect to 127.0.0.1:7555` / `Connection refused` | Tunnel isn't up | [The recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner) |
 | Workstation: `unauthorized` | Phone is waiting for you to approve the workstation's key | Tap **Allow** (with "Always allow") on the phone |
-| Device drops after a while | Termux was frozen/killed in the background, or the network changed (without WireGuard) | `termux-wake-lock`, Termux in "Never sleeping apps", rerun ssh; turn on WireGuard for persistence |
+| Device drops after a while | Termux was frozen/killed in the background, or the network changed (without WireGuard) | Part A of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner); keep Termux in "Never sleeping apps" and WireGuard on |
 | USB debugging greyed out / Wireless debugging won't stay on | Samsung Auto Blocker | Settings → Security and privacy → Auto Blocker → off |
 
 ### 9.1 A stale tunnel after a network drop (2026-09-28)
@@ -700,6 +679,15 @@ stayed open throughout; only the SSH leg had died.
 - **sshd notices dead sessions:** `ClientAliveInterval 15` × `ClientAliveCountMax 20`, so silence is tolerated for 5 minutes. That's long enough to survive the nightly router restart, short enough to end a truly dead session.
 - **The newest connection replaces a dead one at once,** through the tunnel key's forced command.
 - Details: [`docs/self-healing-tunnels.md`](docs/self-healing-tunnels.md).
+
+### 9.2 Termux killed while the phone stayed up (2026-11-09)
+
+- **00:45:24:** the workstation's tunnel session closed. Android's record, `dumpsys activity exit-info com.termux`, shows Termux killed that same second: `reason=2 (SIGNALED)`, status 9, importance 125 (a foreground service).
+- **Termux was already exempt:** battery-whitelisted, `RUN_ANY_IN_BACKGROUND allow`, standby bucket 5, with the wake lock held.
+- **The phone stayed up:** uptime from 08/11 ~08:10, and `service.adb.tcp.port` was still 5555.
+- **Same kind of kill:** 06/11 01:18, 29/10 03:09 and 23/10 18:40. What sends it isn't known; logcat reaches back only about an hour.
+- **The owner found Wireless debugging OFF** and suspected it. It's always off away from Wi-Fi and wasn't the cause.
+- **12:09–12:10:** part A of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner), typed by the owner in Termux, brought the link back. The two `pkill` lines printed nothing; `adb devices` showed `127.0.0.1:5555 device` (plus the harmless `emulator-5554`); the log's last line was `connect 172.30.77.1`. No hotspot or Wireless debugging was needed.
 
 ---
 
@@ -778,6 +766,7 @@ Things to keep in mind:
 
 - **Reboot = redo the bootstrap** (needs a Wi-Fi client connection for a
   minute, or a USB cable). Non-rooted phones can't make port 5555 persistent.
+- **Android can kill Termux** despite every exemption (four times, 23/10–09/11/2026; killer unknown). Nothing on the workstation can restart it; part A of [the recovery card](AGENT_BRIEFING.md#the-recovery-card-give-this-to-the-owner) does.
 - **Unattended reconnection: solved on 2026-10-05** with a restricted key ([self-healing](docs/self-healing-tunnels.md)). It survives outages of up to 5 minutes without dropping; longer ones reconnect by themselves.
 - **Without WireGuard, a network switch kills the SSH session.** The loop then reconnects, but only after the 5-minute silence limit. Keep WireGuard on for instant survival.
 - **mDNS auto-discovery never works through the tunnel,** so IP:port values
